@@ -1,0 +1,67 @@
+# Trending-regime variant of the learning configuration (CHANGES.md C12).
+#
+# Same MDP as learn.yaml; the market differs in one parameter: each simulation the
+# fundamental drifts at fund_drift = 0.04 cents per second, upward or downward with equal
+# probability (about 70 cents over the 30-minute window, against a standard deviation of
+# about 25-40 cents of the random part). The sign is not observable directly; the price
+# history shows it. A fixed schedule cannot use it, so TWAP is no longer optimal: buying
+# faster in an uptrend and slower in a downtrend lowers the shortfall. An agent that knows
+# the sign gains about 9 cents per share over TWAP (flat corridor 0.2, 40 seeds).
+name: learn_trend
+
+environment:
+  background_config: rmsc04
+  mkt_close: "16:00:00"
+  timestep_duration: "1s"
+  starting_cash: 1000000
+  state_history_length: 4
+  market_data_buffer_length: 50
+  first_interval: "00:05:00"
+  parent_order_size: 20000
+  execution_window: "00:30:00"
+  direction: BUY
+  q_min: 20
+  num_action_levels: 4
+  depth_penalty_alpha: 2.0
+  beta_not_enough: 5.0
+  beta_too_much: 5.0
+  is_weight: 1.0
+  action_mode: schedule
+  action_repeat: 10
+  schedule_band: 0.2
+  schedule_corridor: flat          # the flat corridor leaves room to tilt the schedule
+  reward_mode: vs_twap
+  state_features: [schedule_dev, time_pct, imbalance_5, mid_minus_p0, ret_300, ret_60, dev_300]
+
+background:
+  num_noise_agents: 1000
+  num_value_agents: 102
+  num_momentum_agents: 12
+  mm_wake_up_freq: "60S"
+  fund_drift: 0.04                 # cents per second, random sign per simulation
+
+training:
+  algorithm: DQN
+  seed: 10
+  learning_rates: [1.0e-3, 5.0e-4, 2.0e-4]
+  selected_learning_rate: 5.0e-4
+  extra_seeds: [20, 30]
+  total_timesteps: 150000
+  lr_decay_steps: 135000
+  epsilon_timesteps: 30000
+  final_epsilon: 0.02
+  gamma: 0.99
+  hiddens: [50, 20]
+
+evaluation:
+  policies: [RL, TWAP, Passive, Random]
+  num_seeds: 50
+  plot_seeds: 20
+  seed_offset: 1000
+  scenarios:
+    standard: {}
+    noise_10: {num_noise_agents: 10}
+    noise_2000: {num_noise_agents: 2000}
+    momentum_6: {num_momentum_agents: 6}
+    momentum_24: {num_momentum_agents: 24}
+    no_drift: {fund_drift: 0.0}      # control: the original market (learn.yaml), no trend

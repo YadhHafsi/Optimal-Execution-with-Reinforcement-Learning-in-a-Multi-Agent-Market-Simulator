@@ -1,0 +1,72 @@
+# Stage 2: push the coarse-decision arm that came out of stage 1 (decisions every
+# 10 s with 40-share lots completed 100% and had a higher mean shortfall than TWAP,
+# not significantly). More steps, three seeds, penalty / learning-rate / exploration
+# variants, a 5 s variant, and the action_repeat variant (coarse decisions executed
+# as 1 s child orders). Evaluated on 200 seeds against TWAP at the same granularity
+# and against the paper's 1 s / 20-share TWAP (results/reference_1s).
+name: stage2
+config: experiments/configs/paper.yaml
+eval_seeds: 200
+eval_seed_offset: 1000
+reference_episodes: results/reference_1s/standard/episodes.csv
+scenarios: [standard]
+parallel: 9
+runs:
+  - name: c10_q40_s10
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 10
+    epsilon_timesteps: 30000
+    env_override: {timestep_duration: "10s", q_min: 40, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  - name: c10_q40_s20
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 20
+    epsilon_timesteps: 30000
+    env_override: {timestep_duration: "10s", q_min: 40, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  - name: c10_q40_s30
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 30
+    epsilon_timesteps: 30000
+    env_override: {timestep_duration: "10s", q_min: 40, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  - name: c10_q40_b50_s10
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 10
+    epsilon_timesteps: 30000
+    env_override: {timestep_duration: "10s", q_min: 40, num_action_levels: 4, beta_not_enough: 50, beta_too_much: 50}
+  - name: c10_q40_lr1e-4_s10
+    total_timesteps: 300000
+    lr: 1.0e-4
+    lr_decay_steps: 290000
+    seed: 10
+    epsilon_timesteps: 60000
+    env_override: {timestep_duration: "10s", q_min: 40, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  - name: c10_q40_eps100k_s10
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 10
+    epsilon_timesteps: 100000
+    env_override: {timestep_duration: "10s", q_min: 40, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  # finer coarse grid: decisions every 5 s, 20-share lots (TWAP: 56 shares per step)
+  - name: c5_q20_s10
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 10
+    epsilon_timesteps: 30000
+    env_override: {timestep_duration: "5s", q_min: 20, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  # coarse decisions executed as 1 s child orders: decide every 10 s, send k x 20 shares each second
+  - name: ar10_q20_s10
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 10
+    epsilon_timesteps: 30000
+    env_override: {action_repeat: 10, q_min: 20, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  # decide every 5 s, 1 s child orders
+  - name: ar5_q20_s10
+    total_timesteps: 300000
+    lr: 1.0e-3
+    seed: 10
+    epsilon_timesteps: 30000
+    env_override: {action_repeat: 5, q_min: 20, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}

@@ -1,0 +1,54 @@
+# Stage 3b: schedule-shaped reward (schedule_penalty = lambda per share of deviation from the
+# linear schedule, per step, normalised by X0; CHANGES.md C10.6). Decisions every 10 s with
+# 40-share lots (lambda 0.2 / 1, two seeds), the paper's 1 s / 20-share setting (lambda 1, two
+# learning rates) and 10 s decisions executed as 1 s child orders (action_repeat 10). Evaluated on
+# 200 seeds against TWAP at the same granularity and the paper's 1 s TWAP.
+name: stage3b_shaping
+config: experiments/configs/paper.yaml
+eval_seeds: 200
+eval_seed_offset: 1000
+reference_episodes: results/reference_1s/standard/episodes.csv
+scenarios: [standard]
+parallel: 6
+runs:
+- name: s10_l0.2
+  total_timesteps: 300000
+  lr: 0.001
+  seed: 10
+  epsilon_timesteps: 30000
+  env_override: {timestep_duration: 10s, q_min: 40, num_action_levels: 4, beta_not_enough: 100,
+    beta_too_much: 100, schedule_penalty: 0.2}
+- name: s10_l1
+  total_timesteps: 300000
+  lr: 0.001
+  seed: 10
+  epsilon_timesteps: 30000
+  env_override: {timestep_duration: 10s, q_min: 40, num_action_levels: 4, beta_not_enough: 100,
+    beta_too_much: 100, schedule_penalty: 1.0}
+- name: s10_l1_s20
+  total_timesteps: 300000
+  lr: 0.001
+  seed: 20
+  epsilon_timesteps: 30000
+  env_override: {timestep_duration: 10s, q_min: 40, num_action_levels: 4, beta_not_enough: 100,
+    beta_too_much: 100, schedule_penalty: 1.0}
+- name: s1_l1
+  total_timesteps: 300000
+  lr: 0.001
+  seed: 10
+  epsilon_timesteps: 30000
+  env_override: {beta_not_enough: 100, beta_too_much: 100, schedule_penalty: 1.0}
+- name: s1_l1_lr1e-4
+  total_timesteps: 300000
+  lr: 0.0001
+  seed: 10
+  epsilon_timesteps: 60000
+  env_override: {beta_not_enough: 100, beta_too_much: 100, schedule_penalty: 1.0}
+  lr_decay_steps: 290000
+- name: ar10_l1
+  total_timesteps: 300000
+  lr: 0.001
+  seed: 10
+  epsilon_timesteps: 30000
+  env_override: {action_repeat: 10, q_min: 20, num_action_levels: 4, beta_not_enough: 100,
+    beta_too_much: 100, schedule_penalty: 1.0}

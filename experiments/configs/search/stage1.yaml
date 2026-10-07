@@ -1,0 +1,72 @@
+# Stage 1 of the hyper-parameter search: can a DQN variant beat TWAP?
+# One run per hypothesis, all with the terminal penalty 100 (the only penalty at
+# which the trained agent completes the order), seed 10, 200 000 steps unless the
+# decision interval is coarser. Evaluated out of sample on 50 seeds against TWAP,
+# Passive and Random at the same execution granularity, and against the paper's
+# 1 s / 20-share TWAP (results/paper).
+name: stage1
+config: experiments/configs/paper.yaml
+eval_seeds: 50
+scenarios: [standard]
+parallel: 9
+runs:
+  # control: paper MDP, penalty 100, twice the paper's training budget
+  - name: b100_control_200k
+    total_timesteps: 200000
+    lr: 1.0e-3
+    seed: 10
+    env_override: {beta_not_enough: 100, beta_too_much: 100}
+  # multi-step returns: propagate the terminal penalty and the fill costs faster
+  - name: b100_nstep20
+    total_timesteps: 200000
+    lr: 1.0e-3
+    seed: 10
+    env_override: {beta_not_enough: 100, beta_too_much: 100}
+    dqn_override: {n_step: 20}
+  # undiscounted objective (the episode reward is what is evaluated)
+  - name: b100_gamma1
+    total_timesteps: 200000
+    lr: 1.0e-3
+    seed: 10
+    gamma: 1.0
+    env_override: {beta_not_enough: 100, beta_too_much: 100}
+  # slow learning rate with a long decay (the lr 1e-4 run was the only one buying dips)
+  - name: b100_lr1e-4_long
+    total_timesteps: 200000
+    lr: 1.0e-4
+    lr_decay_steps: 190000
+    epsilon_timesteps: 50000
+    seed: 10
+    env_override: {beta_not_enough: 100, beta_too_much: 100}
+  # reward scaled x10 (same MDP: shortfall weight, depth alpha and penalty all x10)
+  - name: b100_scale10
+    total_timesteps: 200000
+    lr: 1.0e-3
+    seed: 10
+    env_override: {beta_not_enough: 1000, beta_too_much: 1000, is_weight: 10.0, depth_penalty_alpha: 20.0}
+  # larger replay, slower target, bigger batches
+  - name: b100_bigreplay
+    total_timesteps: 200000
+    lr: 1.0e-3
+    seed: 10
+    env_override: {beta_not_enough: 100, beta_too_much: 100}
+    dqn_override: {replay_buffer_config.capacity: 500000, target_network_update_freq: 2000, train_batch_size: 128, num_steps_sampled_before_learning_starts: 5000}
+  # wider Q head
+  - name: b100_hiddens256
+    total_timesteps: 200000
+    lr: 1.0e-3
+    seed: 10
+    hiddens: [256, 128]
+    env_override: {beta_not_enough: 100, beta_too_much: 100}
+  # coarser decisions: one every 10 s (180 steps), lots of 40 shares (TWAP: 111 shares per step)
+  - name: coarse10s_q40
+    total_timesteps: 150000
+    lr: 1.0e-3
+    seed: 10
+    env_override: {timestep_duration: "10s", q_min: 40, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}
+  # coarser decisions: one every 30 s (60 steps), lots of 100 shares (TWAP: 333 shares per step)
+  - name: coarse30s_q100
+    total_timesteps: 100000
+    lr: 1.0e-3
+    seed: 10
+    env_override: {timestep_duration: "30s", q_min: 100, num_action_levels: 4, beta_not_enough: 100, beta_too_much: 100}

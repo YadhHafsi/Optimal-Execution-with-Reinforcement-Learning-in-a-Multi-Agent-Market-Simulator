@@ -1,0 +1,49 @@
+# Tiny configuration used by the test-suite and CI: 2-minute window, 2000 shares.
+# Same MDP as paper.yaml, only the horizon / order size are reduced so that an
+# episode runs in about a second.
+name: smoke
+
+environment:
+  background_config: rmsc04
+  mkt_close: "16:00:00"
+  timestep_duration: "1s"
+  starting_cash: 1000000
+  state_history_length: 4
+  market_data_buffer_length: 50
+  first_interval: "00:05:00"
+  parent_order_size: 2000
+  execution_window: "00:02:00"
+  direction: BUY
+  q_min: 20
+  num_action_levels: 4
+  depth_penalty_alpha: 2.0
+  beta_not_enough: 5.0
+  beta_too_much: 5.0
+  is_weight: 1.0
+
+background:
+  num_noise_agents: 1000
+  num_value_agents: 102
+  num_momentum_agents: 12
+  mm_wake_up_freq: "60S"
+
+training:
+  algorithm: DQN
+  seed: 10
+  learning_rates: [1.0e-3]
+  selected_learning_rate: 1.0e-3
+  total_timesteps: 3000
+  lr_decay_steps: 2700
+  epsilon_timesteps: 1000
+  final_epsilon: 0.02
+  gamma: 0.9999
+  hiddens: [50, 20]
+
+evaluation:
+  policies: [TWAP, Passive, Random]
+  num_seeds: 3
+  plot_seeds: 3
+  seed_offset: 1000
+  scenarios:
+    standard: {}
+    noise_10: {num_noise_agents: 10}

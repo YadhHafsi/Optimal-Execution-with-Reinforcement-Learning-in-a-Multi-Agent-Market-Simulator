@@ -1,0 +1,69 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite the paper below (preferred-citation)
+  and, if you refer to the code itself, this repository.
+type: software
+title: >-
+  Reproducibility code for "Optimal Execution with Reinforcement Learning in a
+  Multi-Agent Market Simulator"
+abstract: >-
+  ABIDES-based Gym environment, DQN training scripts, hand-crafted execution
+  baselines (TWAP, Passive, Random) and evaluation/figure scripts reproducing
+  Hafsi and Vittori (ACDSA 2026). Built on the ABIDES simulator (J.P. Morgan
+  Chase 2021, Georgia Tech Research Corporation 2019).
+authors:
+  - family-names: Hafsi
+    given-names: Yadh
+    orcid: https://orcid.org/0009-0001-0686-0349
+    affiliation: CMAP, Ecole Polytechnique
+  - family-names: Vittori
+    given-names: Edoardo
+    orcid: https://orcid.org/0000-0003-4648-1797
+    affiliation: Intesa Sanpaolo
+repository-code: https://github.com/YadhHafsi/Optimal-Execution-with-Reinforcement-Learning-in-a-Multi-Agent-Market-Simulator
+license: BSD-3-Clause
+keywords:
+  - optimal execution
+  - reinforcement learning
+  - agent-based simulation
+  - limit order book
+  - ABIDES
+  - DQN
+identifiers:
+  - type: other
+    value: arXiv:2411.06389
+    description: Open-access preprint of the paper (arXiv, CC BY 4.0)
+  - type: doi
+    value: 10.1109/ACDSA67686.2026.11467851
+    description: IEEE Xplore version of the paper
+preferred-citation:
+  type: conference-paper
+  title: Optimal Execution with Reinforcement Learning in a Multi-Agent Market Simulator
+  authors:
+    - family-names: Hafsi
+      given-names: Yadh
+      orcid: https://orcid.org/0009-0001-0686-0349
+      affiliation: CMAP, Ecole Polytechnique
+    - family-names: Vittori
+      given-names: Edoardo
+      orcid: https://orcid.org/0000-0003-4648-1797
+      affiliation: Intesa Sanpaolo
+  collection-title: >-
+    2026 International Conference on Artificial Intelligence, Computer, Data
+    Sciences and Applications (ACDSA)
+  collection-type: proceedings
+  conference:
+    name: >-
+      2026 International Conference on Artificial Intelligence, Computer, Data
+      Sciences and Applications (ACDSA)
+  publisher:
+    name: IEEE
+  year: 2026
+  start: 1
+  end: 9
+  doi: 10.1109/ACDSA67686.2026.11467851
+  url: https://ieeexplore.ieee.org/document/11467851
+  identifiers:
+    - type: other
+      value: arXiv:2411.06389
+      description: Open-access preprint (arXiv, CC BY 4.0)

@@ -1,0 +1,51 @@
+{
+  "env_config": {
+    "background_config": "rmsc04",
+    "mkt_close": "16:00:00",
+    "timestep_duration": "1s",
+    "starting_cash": 1000000,
+    "state_history_length": 4,
+    "market_data_buffer_length": 50,
+    "first_interval": "00:05:00",
+    "parent_order_size": 20000,
+    "execution_window": "00:30:00",
+    "direction": "BUY",
+    "q_min": 20,
+    "num_action_levels": 4,
+    "depth_penalty_alpha": 2.0,
+    "beta_not_enough": 5.0,
+    "beta_too_much": 5.0,
+    "is_weight": 1.0,
+    "action_mode": "schedule",
+    "action_repeat": 10,
+    "schedule_band": 0.2,
+    "schedule_corridor": "linear",
+    "reward_mode": "vs_twap",
+    "state_features": [
+      "schedule_dev",
+      "time_pct",
+      "imbalance_5",
+      "imbalance_1",
+      "dev_300",
+      "ret_60"
+    ],
+    "background_config_extra_kvargs": {
+      "num_noise_agents": 1000,
+      "num_value_agents": 102,
+      "num_momentum_agents": 12,
+      "mm_wake_up_freq": "60S"
+    }
+  },
+  "lr": 0.0005,
+  "seed": 10,
+  "total_timesteps": 100000,
+  "lr_decay_steps": 90000,
+  "epsilon_timesteps": 20000,
+  "gamma": 0.99,
+  "hiddens": [
+    50,
+    20
+  ],
+  "env_override": [],
+  "dqn_override": {}
+}

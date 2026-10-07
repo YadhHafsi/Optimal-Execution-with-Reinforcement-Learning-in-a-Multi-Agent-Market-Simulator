@@ -1,0 +1,70 @@
+# Learning configuration (CHANGES.md C11).
+#
+# Same market as paper.yaml (RMSC-4, market makers on the 60 s default), same
+# parent order (20 000 shares in 30 minutes starting 09:35), but an MDP in which
+# the DQN agent learns a state-dependent execution schedule:
+#   * decisions every 10 s (action_repeat) with child market orders every second;
+#   * actions are participation multipliers {0, 0.5, 1, 1.5, 2} of the TWAP rate
+#     inside a corridor around the TWAP schedule that closes on X0 (completion is
+#     guaranteed, no terminal penalty to tune);
+#   * the reward is the shortfall difference against a TWAP executed at the mid
+#     (reward_mode vs_twap), so it does not depend on the arrival price;
+#   * the state carries the position in the corridor, the time, the 5-level and
+#     best-level imbalance and two slow trend terms.
+# The agent matches TWAP's mean shortfall with 100% completion (see models/dqn_schedule_policy).
+name: learn
+
+environment:
+  background_config: rmsc04
+  mkt_close: "16:00:00"
+  timestep_duration: "1s"
+  starting_cash: 1000000
+  state_history_length: 4
+  market_data_buffer_length: 50
+  first_interval: "00:05:00"
+  parent_order_size: 20000
+  execution_window: "00:30:00"
+  direction: BUY
+  q_min: 20                        # unused in schedule mode (kept for the lot-mode baselines)
+  num_action_levels: 4             # 5 actions: multipliers 0, 0.5, 1, 1.5, 2 of the TWAP rate
+  depth_penalty_alpha: 2.0
+  beta_not_enough: 5.0             # never triggers: the corridor completes the order
+  beta_too_much: 5.0
+  is_weight: 1.0
+  action_mode: schedule
+  action_repeat: 10                # one decision every 10 s, 180 per episode
+  schedule_band: 0.2               # corridor half-width, fraction of X0
+  schedule_corridor: linear        # closes linearly on X0 at T
+  reward_mode: vs_twap
+  state_features: [schedule_dev, time_pct, imbalance_5, imbalance_1, dev_300, ret_60]
+
+background:
+  num_noise_agents: 1000
+  num_value_agents: 102
+  num_momentum_agents: 12
+  mm_wake_up_freq: "60S"
+
+training:
+  algorithm: DQN
+  seed: 10
+  learning_rates: [1.0e-3, 5.0e-4, 2.0e-4]   # Fig. 4: one run per initial learning rate
+  selected_learning_rate: 5.0e-4             # policy evaluated in Figs. 5-8
+  extra_seeds: [20, 30]                      # Fig. 4b: seed robustness of the selected rate
+  total_timesteps: 100000                    # decisions (about 550 episodes)
+  lr_decay_steps: 90000
+  epsilon_timesteps: 20000
+  final_epsilon: 0.02
+  gamma: 0.99
+  hiddens: [50, 20]
+
+evaluation:
+  policies: [RL, TWAP, Passive, Random]
+  num_seeds: 50
+  plot_seeds: 20
+  seed_offset: 1000
+  scenarios:
+    standard: {}
+    noise_10: {num_noise_agents: 10}
+    noise_2000: {num_noise_agents: 2000}
+    momentum_6: {num_momentum_agents: 6}
+    momentum_24: {num_momentum_agents: 24}

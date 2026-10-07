@@ -1,0 +1,893 @@
+===== PAGE 1 =====
+Optimal Execution with Reinforcement Learning in
+a Multi-Agent Market Simulator
+Yadh Hafsi
+CMAP
+´Ecole Polytechnique
+Paris, France
+https://orcid.org/0009-0001-0686-0349
+Edoardo Vittori
+Intesa Sanpaolo
+Milan, Italy
+https://orcid.org/0000-0003-4648-1797
+Abstract—This study investigates the development of an opti-
+mal execution strategy through reinforcement learning, aiming
+to determine the most effective approach for traders to buy
+and sell inventory within a finite time horizon. Our proposed
+model leverages input features derived from the current state
+of the limit order book and operates at a high frequency to
+maximize control. To simulate this environment and overcome
+the limitations associated with relying on historical data, we
+utilize the multi-agent market simulator ABIDES, which provides
+a diverse range of depth levels within the limit order book. We
+present a custom MDP formulation followed by the results of our
+methodology and benchmark the performance against standard
+execution strategies. Results show that the reinforcement learning
+agent outperforms standard strategies and offers a practical
+foundation for real-world trading applications.
+Keywords—Optimal Execution, Limit Order Book, Reinforce-
+ment Learning, Agent-Based Simulation, Algorithmic Trading,
+Transaction Costs, Market Impact.
+I. INTRODUCTION
+Research in market microstructure shows that large trades
+influence asset prices because the immediate depth of the
+market is limited (see [1]); a single large order can exhaust
+all current buyers or sellers. This suggests that it is generally
+advantageous to split large orders into several smaller blocks.
+There is an extensive stream of literature on how to op-
+timally split orders, which will be introduced in Section II,
+but the majority of this research restricts market behavior to
+Brownian motion with hard coded market impact assumptions
+and does not simulate the liquidity present in the markets,
+obtaining an execution trajectory which is a function of time.
+Reinforcement learning (RL) is a very flexible machine
+learning paradigm which can be applied to learn data-driven
+execution policies, without having to make specific assump-
+tions on market behavior. On the other hand, RL algorithms are
+very data hungry and require thousands of simulations to be
+trained, for this reason having a market simulator is essential.
+One can simulate the market using stochastic processes
+and making assumptions on the market impact, but then the
+optimal approach is to use the traditional solutions which
+are optimal in that context [2]. Another solution can be to
+use historical data, as is done by several in the optimal
+execution with RL framework ( [3], [4]), which gives access to
+LOB information, but in general enables only a simulation of
+temporary impact as the price must revert back to the historical
+dataset while in a realistic framework there is also temporary
+and transient impact (see Section III-B).
+The approach considered in this paper is through the use of a
+multi agent market simulation, which enables the simulation of
+the entire LOB and takes into account the impact of the trades
+in the market. Examples of such simulators for LOB modeling
+include [6]–[9]. This development has facilitated multi-agent
+approaches like [10] and led to the creation of ABIDES [11]
+which is the simulator considered in this work.
+In this paper we present a framework based on RL, specif-
+ically the Double Q Network (DQN) [12] algorithm, to learn
+an optimal execution strategy. Training and testing occur
+on synthetic data generated through the multi-agent market
+simulator ABIDES.
+The rest of the paper is organized as follows, Section II
+reviews the related works, Section III introduces the limit order
+book, market impact, the multi agent simulation and then the
+optimal execution problem setting. Section IV introduces RL
+and explains how the optimal execution problem can be solved
+with this technology. Section V presents our experimental
+results.
+II. RELATEDWORKS
+We will divide the literature on optimal execution into two
+major strands: the classical mathematical finance framework
+and the more recent RL approaches. Within the mathematical
+finance tradition, [13] first established a model where prices
+follow Brownian motion with linear permanent and temporary
+market impact, deriving the Time-Weighted Average Price
+(TW AP) as the optimal solution. This was extended by [14],
+who augmented the objective function with the minimization
+of the variance of the expected shortfall, yielding an ana-
+lytical solution that incorporates risk aversion—resulting in
+more front-loaded execution profiles. [15] further refined the
+model by introducing transient impact that decays over time,
+producing a U-shaped execution trajectory with higher trading
+1
+arXiv:2411.06389v2  [q-fin.TR]  1 Nov 2025
+
+===== PAGE 2 =====
+intensity at the beginning and end of the period. Building on
+this, Busetti and Lillo [16] introduced risk aversion into the
+transient impact model, confirming the U-shaped profile but
+with heavier emphasis on early execution. [17] expanded this
+line of work by testing alternative objective functions, showing
+that inventory penalties act analogously to risk aversion and
+exploring terminal penalties for unfinished execution.
+A common feature across these studies is their focus on
+what we may termstrategic execution: the optimal trading
+trajectory depends solely on deterministic variables such as
+time, permanent impact, and risk aversion, without regard to
+real-time market microstructure or limit order book dynamics.
+The execution period lasts a few hours, with usually five
+minute time-steps. The other type of execution which can
+be analyzed is thetactical execution, where the focus is to
+optimize the trade decisions within each period. In this case,
+LOB information is fundamental.
+Reinforcement learning methods allow for such tactical ex-
+ecution strategies, thus we will now analyze them by dividing
+into the two categories. The strategic RL approaches have
+in general the objective of proving RL can find the optimal
+solutions found by traditional methods. In this category are the
+following papers: [2]–[4], which typically operate over long
+time windows and use algorithms such as Q-learning, DQN,
+or PPO to learn execution policies from historical or simulated
+limit order book data.
+Conversely, tactical RL approaches deal with shorter time
+horizons and more granular decision-making. Early work by
+Nevmyvaka et al. [18] pioneered this direction, optimizing
+execution over five-minute intervals. Subsequent contributions
+[19]–[21], investigated higher frequency control problems such
+as deciding between market and limit orders, stopping execu-
+tion under uncertainty, or leveraging predictive signals to guide
+trades.
+In this work, we aim to unify these two traditionally separate
+layers of the execution problem. By training a reinforcement
+learning agent to operate over a 30-minute window with one-
+second control intervals, we enable the simultaneous learn-
+ing of both strategic scheduling and tactical decision-making
+within a single framework, bridging the gap between high-
+level trade planning and low-level order placement in real time.
+The most similar to our approach is [22], as they use
+ABIDES as the market simulator and they have a high (30
+second) control frequency to learn both a strategic and tactical
+execution. Nonetheless, their experimental results are unsatis-
+factory as they state that their RL agent solution converges
+to the TW AP. Instead, in this work we have run an extensive
+experimental campaign obtaining results superior to the TW AP
+and other baseline strategies.
+III. OPTIMALEXECUTIONSETTING
+A. Limit Order Book
+A limit order book is a comprehensive record of current
+limit orders, where price changes occur discretely in incre-
+ments known as thetick size(see Figure 1). Each order consists
+of a price and size, collectively contributing to the volume
+represented byQ. One of the key elements highlighted in the
+LOB is the concept ofliquidity.
+Fig. 1: Representation of the Limit Order Book
+In a perfectly liquid market, any quantity of a specific secu-
+rity can be immediately converted to cash. Measurement of
+liquidity involves metrics such as traded value/turnover, bid-
+ask spread, and trade-through intensity, as described in [23].
+a) Order Types:When trading in a LOB, it is possible
+to employ different types of orders. The limit order is the
+most used and entails specifying the price at which we want
+to execute the trade. There is no guarantee that the trade will
+happen, as the limit price may never be reached. These orders
+are executed considering a price-time priority, also known
+as First-In-First-Out (FIFO). Then there is the market order,
+which consists of a request to carry out the order immediately
+at the best price available in the market. To be more specific, a
+buy (sell) order is matched with limit sell (buy) orders starting
+with the best ask price. Finally, there are other types of orders,
+such as fill-or-kill orders and others.
+b) LOB features:In algorithmic trading, it is popular to
+use signals derived from specific characteristics, including the
+following:
+•Total depth: it corresponds to the cumulative sum of
+volume at multiple price levelsdof the LOB:
+TDk
+h =
+kX
+j=1
+Qj
+h fork∈{1,...,d}, h∈{bid, ask},
+whereQ k
+ask (Qk
+bid) is the volume of outstanding limit
+orders at thek-th best ask (bid) price level.
+•Volume imbalance: it describes the difference between the
+existing order volume on the bid and ask price levels. It
+can be defined as:
+vk
+h = TDk
+h
+TDk
+ask +TD k
+bid
+fork∈{1,...,d}, h∈{bid, ask}.
+•Mid price: it is the midpoint between the best bid and
+best ask prices:
+Pmid = Pbest ask +P best bid
+2 .
+•Spread: it is the difference between the best ask and the
+best bid:
+Pmid =P best ask−P best bid.
+2
+
+===== PAGE 3 =====
+B. Market impact
+Market impact refers to the effect that trades have on asset
+prices and is a key consideration in the design of optimal exe-
+cution strategies. The literature typically distinguishes between
+three primary forms of market impact:
+•Temporary Impact:This refers to the immediate but
+short-lived distortion in price caused by a trade. It is
+generally attributed to the consumption of available liq-
+uidity at the best bid or ask and tends to vanish quickly
+as new orders replenish the book or the market reverts.
+Temporary impact is typically modeled as a cost that
+affects only the execution price of the current trade.
+•Permanent Impact:Permanent impact captures the long-
+lasting effect that a trade has on the asset price. It is often
+interpreted as the market incorporating the information
+revealed by the trade, such as the presence of an informed
+trader or a shift in supply and demand. Permanent impact
+is usually modeled as a linear function of cumulative
+volume and affects the price trajectory permanently.
+•Transient Impact:Transient impact lies between the two
+extremes above. It reflects a price impact that decays
+gradually over time rather than disappearing instanta-
+neously (as with temporary impact) or persisting indefi-
+nitely (as with permanent impact). This type of impact is
+useful for modeling situations where market participants
+adjust their behavior in response to past trades, leading
+to delayed and decaying price effects. Transient impact
+is often captured through decaying kernels or memory
+functions in execution models.
+Fig. 2: Stylized representation of average permanent vs.
+temporary price impact (see [24]).
+ABIDES reproduces realistic market impact because price
+responses emerge endogenously from the interaction of het-
+erogeneous agents rather than from imposed functional forms.
+Large orders deplete liquidity at the best quotes, prompting
+market makers and other agents to adjust their behavior. This
+naturally generates short-lived distortions resembling tempo-
+rary impact as well as longer-lasting adjustments consistent
+with permanent and transient impact. Thus, the dynamics of
+impact arise from microstructural interactions, providing a
+realistic environment for testing execution strategies.
+C. Configuration of Multi-Agent Simulations
+Let(Ω,F,F={F t}t≥0,P)be a complete filtered proba-
+bility space endowed with right-continuous filtration{F t}t≥0.
+We assume that the filtration{F t}t≥0 supports a standard
+P-Brownian motionWand a random Poisson processN
+with intensityλ. In the simulation, various agents, such as
+Exchange Agents, Adaptive Agents, Market Maker Agents,
+Value Agents, and Momentum Agents, develop their trading
+strategies based on an estimate of the fundamental value,
+which is defined by an Ornstein-Uhlenbeck (OU) process. The
+dynamics of the fundamental process process can be described
+by the following stochastic differential equation (SDE):
+dXt =θ(µ−X t) dt+σdW t +JdN t,
+where:
+•θis the rate of mean reversion,
+•µis the long-term mean,
+•σis the volatility,
+•Jis the jump size, drawn from a bimodal distribution
+centered at zero. Specifically,Jcan take values from two
+Gaussian distributions:N(µ 1,σ 2
+1)andN(µ 2,σ 2
+2), where
+µ1 =−µ 2 andσ 1 =σ 2, ensuring the overall mean of
+the bimodal distribution is zero.
+The jump processNis introduced to represent the impact of
+the arrival of major news events on the fundamental value of
+the traded asset. This allows us to obtain improvements of the
+simulation computation time while producing more realistic
+price time series.
+We chose the RMSC-4 configuration, which is the reference
+configuration in ABIDES and was also used in [25] and
+[Shi and Cartlidge(2023)]. Several key settings are defined
+within the RMSC-4 configuration to realistically simulate
+market behaviors and participant interactions. Exchange agents
+manage order books and historical data streams, maintaining
+a depth of 10 levels and a history of 500 streams.
+Noise agents introduce randomness into the market through
+the actions of 1000 agents.
+Value agents, numbering 102, base their trades on a true
+mean fundamental value, which behaves like an Ornstein-
+Uhlenbeck (OU) process centered aroundµ va of $100,000.
+This process has a mean reversion parameterθ va set at
+1.67×10 −15 and an arrival rateλ va of5.7×10 −12.
+An oracle-like agent tracks the mean-reversion process with
+a parameterθor set at1.67×10−16 and a volatility of5×10−10
+for the fundamental time series, providing a benchmark for the
+fundamental value.
+Market Maker agents dynamically adjust their pricing strate-
+gies. They use an adaptive window size, set their order size
+to0.025percent of the volume, maintain a price range within
+10 ticks, and operate with a wake-up frequency of1second
+to update their quotes. This setup uses a higher frequency
+compared to other standard configurations, making it more
+realistic and better adapted to today’s markets (e.g. [21], [22]).
+Momentum agents, totaling12, trade according to recent
+market trends, reacting to short-term price movements.
+These settings are designed to provide a comprehensive
+simulation of market dynamics, reflecting the diverse strate-
+gies and behaviors of market participants within a controlled
+environment, as well as simulate realistic market impact.
+3
+
+===== PAGE 4 =====
+0 2000 4000 6000 8000 10000 12000 14000
+Time-steps
+99800
+99850
+99900
+99950
+100000
+100050
+100100
+100150Ask Price
+Fig. 3: Sample paths of ask prices generated by ABIDES for
+different seeds.
+D. Problem Formulation
+The optimal execution problem consists in executing a trade
+ofX 0 shares over a time interval[0,T]. In assessing the trade,
+it’s essential to consider its immediate transactional impact,
+temporary price fluctuations, and potential long-term effects
+on future prices due to lasting alterations in pricing dynamics.
+Additionally, a penalty could be considered if the agent fails
+to accomplish complete execution on time.
+In a discrete-time setting withN+1decision points, the
+purchasing strategy (analogously for selling) is formulated as
+a sequential decision process, in which the trader determines
+the quantityx k to buy at each time stept k =kT/N, for
+k∈{0,...,N}, witht 0 = 0andt N =T. The cumulative
+purchases form a trajectory{x 0,...,x N}, wherex k denotes
+the cumulative number of shares acquired by timet k. By
+construction,x 0 = 0, and full completion requiresxN =X 0 at
+the terminal time. LetP k denote the average execution price
+for trade∆x n =x k−x k−1. The goal is to minimize the
+expected total execution cost for a risk-neutral trader over a
+finite time horizonT:
+min
+x∈A
+E
+" NX
+k=0
+Pk∆xk
+#
+,(1)
+A=
+(
+{x0,x 1,...,x N}∈R N+1
++ ;
+NX
+k=0
+|∆xk|=X 0
+)
+.(2)
+This cost functional corresponds to the Implementation Short-
+fall (IS) introduced by [26], which measures the excess cost
+of execution relative to an instantaneous purchase at the initial
+market priceP 0. Formally, for a purchasing strategy, the IS is
+IS=
+NX
+k=0
+Pk ∆xk−X 0P0.
+Initial studies on optimal execution are based on a stochastic
+framework in which the dynamics of the assets and execution
+costs are modeled through SDEs. The first formal analysis
+of the optimal execution problem is by [13]. Under suitable
+conditions and using dynamic programming, they provide a
+closed-form formula as a solution to the optimal execution
+problem. Subsequently, an extension of the stochastic model
+was provided by introducing permanent and temporary effects
+due to the impacts of orders on the market and by inserting
+a risk-aversion parameter by [14]. The Almgren-Chriss model
+optimizes the trading strategyx(t)over a time horizon[0,T]
+to minimize total costs, and has a parameter to adjust the trade-
+off between minimizing market impact and execution costs.
+The most commonly used execution algorithm is theTime
+Weighted Average Price (TWAP). TW AP aims to execute a
+trade of sizeX 0 evenly over a specified time horizonTin sizes
+ofX 0/N. The arithmetic average of prices collected yields the
+TW AP price:
+TW AP=X0
+N
+NX
+k=0
+Pk,(3)
+whereP k is the average at which each trade was executed
+through a market order sent at timet k. In Almgren-Chriss
+terms [14], TW AP corresponds to a scenario with zero risk
+aversion, where the trader is indifferent to price volatility and
+only aims to minimize market impact by trading evenly.
+IV. REINFORCEMENTLEARNING
+A discrete-time Markov Decision Process (MDP) (see [27])
+is defined as a tuple⟨S,A,P,R,γ,µ⟩, whereSis the state
+space,Athe action space,P(·|s,a)is a Markovian transition
+model that assigns to each state-action pair(s,a)the prob-
+ability of reaching the next states ′,R(s,a)is a bounded
+reward function,γ∈[0,1[is the discount factor, andµis
+the distribution of the initial state. The policy of an agent
+is characterized byπ(·|s), which defines for each statesan
+action with a probability distribution over the action space.
+A. Embedding Optimal Execution as an MDP
+The basic building block for applying RL algorithms is a
+description of the environment as a MDP:
+•State space:Percentage holdings remaining, percentage
+time remaining, volume imbalance up to 5 levels of the
+LOB, best bid price, best ask price.
+•Action space:5 possibile actions: do nothing, consume
+Qk
+t =Q min×k,k= 1,...,4.
+•Reward function:
+rt =Q k
+t×(P 0−Pt)| {z }
+implementation shortfall
+−αd t|{z}
+penalty
+−βIT 1 l{t=T}
+| {z }
+terminal penalty
+,(4)
+whereP t is the average execution price,P 0 the arrival
+price,d t is the depth consumed by the market order at
+timet, andα >0,I T is the remaining inventory at
+the end of the execution period andβ >0. Once the
+execution is completed, the reward remains zero for the
+rest of the period, whereas any residual inventory at time
+Tincurs a terminal penalty.
+The reward comprises two components: theimplementation
+shortfalland a penalty associated with the depth consumed
+by the executed orders. This configuration allows the agent to
+develop optimal strategies for acquiring inventory while reduc-
+ing significant market impact. Note that we are considering an
+execution problem in which we want to buy, for this reason
+we considerP 0−Pt in the implementation shortfall. This is
+4
+
+===== PAGE 5 =====
+because if we buy at a lower price compared to the arrival price
+P0, then we lower our execution costs. If we were considering
+a sell problem, we would need to invert toP t−P 0.
+B. Tailoring the Environment
+Although we have the standard objective in Equation (1),
+how to appropriately define the MDP to achieve that objective
+is not straightforward. In fact, there are several factors which
+make that objective challenging:
+1) The asset’s price movements are usually independent of
+your action. If/when the action influences the movement
+of the price, then it is adverse to your objective as you
+are generating a market impact.
+2) It is mandatory to finish the execution by the end of the
+execution period, but this requirement is hard to embed
+in the standard reward formulation.
+3) If you have a long execution period available, compared
+to the total execution size, then you can choose whether
+to execute rapidly, thus increasing market impact, or
+execute at a slower rate but risking an adverse market
+movement.
+To tackle the first factor, we included the penalty in the reward
+function, which has the objective of emphasizing that we want
+to avoid market impact. To address the second, we include an
+additional large penalty if the execution is not finished by the
+end of the total available period. To address the third factor,
+the penalty in the reward function is enabling. In fact, thanks
+to the penalty, the reward is negative in most cases. As a 0
+reward obtained consistently once the execution is finished is
+preferable to a negative reward, the learning agent should be
+incentivized to finish earlier.
+We also explored different state and action space setups,
+and those described in Section IV-A gave the best results.
+C. Algorithm
+We consider finite horizon problems in which future rewards
+are exponentially discounted withγ. Let us define a trajectory
+as a sequence of states, actions, and rewards, up to a stopping
+timeτ:
+(s0,a 0,r 1,s 1,a 1,r 2,...,s τ−1,aτ−1,rτ).
+The objective in RL is the maximization of the expected
+return, given an initial state distribution
+Jπ :=E π
+s0∼µ
+h τX
+i=1
+γi−1ri.
+i
+,
+where the return is the discounted sum of the rewards. Numer-
+ous RL algorithms are available (see [28]–[30]). In this work,
+we focus on the Deep Q-Network (DQN) algorithm, a model-
+free, online, off-policy reinforcement learning approach, as
+it provided the best learning results. The DQN algorithm is
+detailed in algorithm 1.
+Algorithm 1Deep Q-Network
+1:Initialize replay memoryDto capacityN
+2:Initialize action-value functionQwith random weights
+3:forepisode = 1 to Mdo
+4:Initialize states 1
+5:fort = 1 to Tdo
+6:With probabilityϵselect a random actiona t
+7:Otherwise selecta t = arg maxaQ(st,a;θ)
+8:Execute actiona t
+9:Observe rewardr t and next states t+1
+10:Store transition (s t,at,rt,st+1)inD
+11:Sample random minibatch of transitions
+(sj,aj,rj,sj+1)fromD
+12:Sety j =r j +γmax a′Q(sj+1,a′;θ)
+13:Perform a gradient descent step on(y j −
+Q(sj,aj;θ)) 2
+14:end for
+15:end for
+V. EXPERIMENTALRESULTS
+We defined the environment to be as realistic as possible,
+by using a 1 second control frequency, so that the agent
+has the maximum flexibility in deciding when to execute.
+Furthermore, we gave a long maximum execution period so
+as to give it the possibility to choose how much to make the
+execution last. In the results that follow, we focus on a buy
+execution, but the results hold also for a sell execution where
+the only thing to be changed is the sign of the implementation
+shortfall in the reward.
+A. Environment setup
+The environment includes several parameters and variables.
+The total size of the order to execute is fixed at20000shares.
+The direction specifies whether the parent order is a buy or sell,
+defaulted to buy. AtimeWindowof30minutes is allotted for
+the agent to execute the entire order, with a time step duration
+set to1second. We set the incremental sizeQ min = 20for the
+buy or sell orders placed by the agent. Finally, the penalty is a
+constant amount imposed per non-executed share at the end of
+the time window, set at a default of5per share. Additionally,
+a penalty of5per share is also applied for over-execution
+beyond the intended order size. Theαfor the depth penalty
+in the reward is set to2.
+B. RL algorithm setup
+We ran a hyperparameter tuning which gave the following
+optimal parameters. We employed DQN, with a neural net-
+work architecture that features fully connected2input layers
+composed of50and20neurons. The learning rate schedule
+implements a linear decrease from10 −3 to0in90,000steps,
+while the exploration rate follows aϵ-Greedy search from1
+to0.02in10,000steps. In addition, we implement a state
+history length of4and a market data buffer of length50. This
+approach is aimed at ensuring the stability of DQN. Finally,
+the objective function is a discounted sum of rewards with a
+5
+
+===== PAGE 6 =====
+discount factor ofγ= 0.9999. This means that the agent treats
+all future rewards almost as equally important which is useful
+in execution problems where rewards come at the end (e.g.,
+penalizing slippage at end of episode).
+We also experimented with alternative state spaces (contin-
+uous and discrete) and algorithms such as TRPO, PPO, and
+actor–critic, but DQN consistently proved the most reliable.
+C. Baseline algorithms
+We utilize the following baseline algorithms to benchmark
+the performance of the RL policy:
+•Time-Weighted Average Price (TW AP): defined in equa-
+tion (3), corresponding to the risk-neutral solution of the
+Almgren–Chriss model.
+•Passive Policy (PP): this policy mostly keeps the agent
+inactive, with a 60% chance of doing nothing. With a
+40% chance, it randomly chooses and executes a quantity
+among four available options, each with equal likelihood.
+•Random Policy (RP): sample whether to use a market
+order or do nothing (quantity of 0). There is a 50% chance
+of doing nothing. Alternatively, it randomly selects and
+executes one of three actions with equal probability: do
+nothing, or consumeQ k
+t =Q min×k, withk= 1,...,3.
+D. Experiments
+Next, we evaluate the RL agent’s ability to execute large or-
+ders while minimizing market impact. This involves a detailed
+comparison of the RL agent’s performance with the baseline
+strategies mentioned earlier.
+-80
+-70
+-60
+-50
+-40
+-30
+-20
+-10
+0
+0 10k 20k 30k 40k 50k 60k 70k 80k 90k100k
+Fig. 4: Average episode reward for DQN agent with a envi-
+ronment seed equal to 10 and learning rates equal to10 −2
+(pink),10−3 (red), and10 −4 (blue).
+1) Standard Configuration Analysis:Figure 4 shows the
+learning curve of the DQN algorithm. The increasing reward
+curve indicates that the environment is correctly formulated
+and that the agent is maximizing implementation shortfall and
+reducing market impact during training, approaching a zero
+average reward as it learns.
+In Figure 5, we evaluate out-of-sample the optimized rein-
+forcement learning policy and compare it to the three base-
+lines. The distribution is created after running 20,30-minute
+windows with different seeds. We observe the average step
+implementation shortfall (see Equation (4)). In this case we
+see that the RL agent generates a lower variance compared to
+the baselines with also a higher average. This suggests that
+the RL execution strategy is capable of executing consistently
+close to the arrival price while minimizing market impact.
+Fig. 5: Implementation shortfall normalized by the initial order
+size distribution.
+Figure 6b shows the execution trajectory of the RL agent:
+how much it has executed of the total size. The agent executes
+a significant portion of its holdings rapidly, followed by a
+more controlled and steady approach as the execution period
+progresses. This pattern aligns with optimal execution princi-
+ples, balancing the trade-off between immediate market impact
+and long-term price stability. By front-loading the execution
+and then tapering off, the agent minimizes the risk of adverse
+market movements while efficiently managing its inventory.
+Figure 6a provides a detailed view of the bid and ask prices
+alongside the actions executed by the RL agent at various time
+steps. The figure illustrates that the actions are aligned with a
+minimal deviation between the bid and ask prices, indicating
+effective control over the execution strategy without causing
+market disruption.
+(a) Distribution of the spreads.
+ (b) Distribution of the volume
+imbalance.
+Fig. 7: Empirical distributions of spreads and imbalance for
+different strategies.
+In Figure 7a, we observe that the RL strategy executes with
+very tight spreads, indicating that it trades at moments when
+liquidity is highest in the limit order book, contrarily to the
+other strategies. Figure 7b shows the distribution of the volume
+imbalance generated by the RL agent’s execution. A market
+impact would be visible with a skewed imabalance. In this case
+the imbalance is centered, indicating a consistent strategy for
+maintaining balance in the LOB.
+StrategyE(IS)E(Pen)E(T)σ 2(IS)
+RL0.0002 -0.005 0.63 0.0011
+TW AP-0.0321 0.000 0.998 0.0014
+Passive-0.0106 -0.007 0.77 0.003
+Random-0.016 -0.003 0.576 0.001
+TABLE I: Comparison of normalized performance metrics
+with1000noise agents and12momentum agents.
+6
+
+===== PAGE 7 =====
+0 100 200 300 400
+Time-steps
+99,850
+99,900
+99,950
+100,000
+100,050
+100,100
+100,150Price
+Bid Price
+Ask Price
+Actions
+Action 1
+Action 2
+Action 3
+Action 4
+(a) Actions taken by the RL agent for a single
+trajectory over time.
+0.0 0.2 0.4 0.6 0.8 1.0
+Time (%)
+0.0
+0.2
+0.4
+0.6
+0.8
+1.0Holdings (%)
+Average
+95% CI
+(b) Execution trajectory of the RL agent: amount
+executed over time.
+0.0 0.2 0.4 0.6 0.8 1.0
+Time (%)
+8
+6
+4
+2
+Q-value
+Action 0
+Action 1
+Action 2
+(c) Temporal evolution of Q-values with respect to
+actions.
+Fig. 6: RL agent behavior in a simulated execution task
+(a)10 noise agents
+ (b)1000 noise agents
+ (c)2000 noise agents
+(d)6 momentum agents
+ (e)12 momentum agents
+ (f)24 momentum agents
+Fig. 8: Implementation shortfall normalized by initial order
+size. Top row varies momentum agents with12fixed. Bottom
+row varies noise agents with1000fixed.
+Table I summarizes some of the metrics also present in the
+plots, adding also the aggressive strategy. The first two rows
+represent the two parts of the reward defined in Equation 4.
+The last row shows on average how much time is necessary
+to finish the execution.
+The RL agent’s ability to keep the order book balanced
+can be attributed to its adaptive response to real-time market
+conditions. When encountering a growing imbalance, the agent
+likely adjusts its trading strategy to prevent further imbal-
+ance, thus avoiding significant deviations in asset prices. By
+maintaining smaller imbalances in the order book, the RL
+agent reduces the risk of market impact, which often leads to
+unfavorable price movements and increased transaction costs.
+2) Robustness to Market Agent Configurations:Next, we
+demonstrate the robustness of our RL strategy by showing that
+it consistently outperforms all benchmark approaches in terms
+of both the expected implementation shortfall and the variance
+of performance across different market configurations. In par-
+ticular, Figures 8 and Tables II and III show the performance
+under varying numbers of noise agents and momentum agents.
+Strategy#NAE(IS)E(Pen)E(T)σ 2(IS)
+RL10 -0.017 -0.0001 0.55 0.0039
+2000 0.0173 -0.0001 0.56 0.00043
+TW AP10 -0.067 0.000 0.998 0.0022
+2000 -0.0184 -0.0035 0.998 0.0024
+Random10 -0.026 -0.003 0.563 0.0004
+2000 -0.039 -0.002 0.61 0.00044
+Passive10 -0.048 -0.035 0.7 0.0024
+2000 -0.0076 -0.003 0.753 0.003
+TABLE II: Comparison of normalized performance metrics
+with varying noise agents and12momentum agents.
+Strategy#MAE(IS)E(Pen)E(T)σ 2(IS)
+RL6 -0.022 -0.001 0.916 0.0038
+24 0.004 -0.001 0.51 0.0035
+TW AP6 -0.028 0.000 0.998 0.0068
+24 -0.049 -0.0015 0.998 0.024
+Random6 -0.049 -0.002 0.573 0.0013
+24 -0.036 0.000 0.54 0.024
+Passive6 -0.024 -0.001 0.79 0.0031
+24 0.0014 -0.0021 0.71 0.049
+TABLE III: Comparison of normalized performance metrics
+with1000noise agents and varying momentum agents.
+We test whether RL outperforms the benchmark strategies
+on implementation shortfall (IS) using one-sided Student’s
+two-samplet-tests with pooled variance (per-strategyn= 50).
+The hypotheses are
+H0 :E(IS) RL≤E(IS) S vs.H 1 :E(IS) RL >E(IS) S,
+whereS∈{TW AP,Random,Passive}denotes the bench-
+mark strategy. Decisions are made against the one-sided 5%
+critical valuet 0.95(98)≈1.660.
+With10noise agents, RL significantly outperforms TW AP
+(t= 4.52) and Passive (t= 2.08). With2000noise agents, RL
+significantly outperforms all benchmarks: TW AP (t= 4.75),
+Random (t= 8.49), and Passive (t= 2.42). With6momentum
+agents, RL significantly outperforms Random (t= 2.14). With
+24momentum agents, RL significantly outperforms TW AP
+(t= 2.26) and Random (t= 1.81).
+Overall, RL consistently achieves statistically significant
+gains in the baseline and under noise-agent stress, and also
+demonstrates advantages in momentum-driven environments.
+7
+
+===== PAGE 8 =====
+VI. CONCLUSIONS
+The results of this study demonstrate the effectiveness of
+using reinforcement learning for optimal execution in financial
+markets. Using the DQN algorithm within a simulated market
+environment, we observed significant improvements in execu-
+tion performance compared to the chosen benchmark strate-
+gies. Our experiments show that the RL agent consistently
+achieved higher returns and lower variance in implementation
+shortfall. The agent’s ability to adapt to market conditions and
+execute trades close to the arrival price resulted in minimized
+market impact and transaction costs. The execution trajectory
+analysis highlighted the strategic balance of the RL agent
+between immediate market impact and long-term price sta-
+bility. The agent managed its inventory efficiently, executing a
+large portion early before transitioning to a steadier pace. This
+behavior aligns with optimal execution principles and reflects
+effective inventory control.
+Although our findings are promising, future work could use
+more tractable simulators such as zero-intelligence frameworks
+that capture key order book dynamics. This would provide a
+clearer benchmark to assess RL learning capabilities under a
+wider range of market conditions.
+REFERENCES
+[1] Bouchaud, Jean-Philippe, J. Doyne Farmer, and Fabrizio Lillo. 2009.
+How markets slowly digest changes in supply and demand. In
+Handbook of Financial Markets: Dynamics and Evolution, pp. 57–
+160. San Diego: North-Holland. Series: Handbooks in Finance.
+https://doi.org/10.1016/B978-012374258-2.50006-3.
+[2] Macri, Andrea, and Fabrizio Lillo. 2024. Reinforcement learning for
+optimal execution when liquidity is time-varying.Applied Mathematical
+Finance31(5): 312–342. Taylor & Francis.
+[3] Hendricks, Dieter, and Diane Wilcox. 2014. A reinforcement learning
+extension to the Almgren–Chriss framework for optimal trade execution.
+In2014 IEEE Conference on Computational Intelligence for Financial
+Engineering & Economics (CIFEr), pp. 457–464. IEEE.
+[4] Ning, Brian, Franco Ho Ting Lin, and Sebastian Jaimungal. 2018.
+Double deep Q-learning for optimal execution.arXiv preprint
+arXiv:1812.06600.
+[5] Alfi, V ., Matthieu Cristelli, Luciano Pietronero, and Andrea Zaccaria.
+2008. Minimal agent based model for financial markets I.The European
+Physical Journal B67: 385–397.
+[6] Alfi, V ., Matthieu Cristelli, Luciano Pietronero, and Andrea Zaccaria.
+2009. Minimal agent based model for financial markets II.The European
+Physical Journal B - Condensed Matter and Complex Systems67: 385–
+397. https://doi.org/10.1140/epjb/e2009-00028-4.
+[7] Chakraborti, Anirban, Ioane Muni Toke, Marco Patriarca, and Fr ´ed´eric
+Abergel. 2011. Econophysics review: II. Agent-based models.Quanti-
+tative Finance11(7): 1013–1041. Taylor & Francis.
+[8] Hamill, L., and N. Gilbert. 2015.Agent-Based Modelling in Economics.
+Wiley.
+[9] Coletta, Andrea, Aymeric Moulin, Svitlana Vyetrenko, and Tucker
+Hybinette Balch. 2022. Learning to simulate realistic limit order book
+markets from data as a World Agent.Proceedings of the Third ACM
+International Conference on AI in Finance.
+[10] Balch, Tucker Hybinette, Mahmoud Mahfouz, Joshua Lockhart, Maria
+Hybinette, and David Byrd. 2019. How to evaluate trading strategies:
+Single agent market replay or multiple agent interactive simulation?
+arXiv preprintarXiv:1906.12010.
+[11] Byrd, David, Maria Hybinette, and Tucker Hybinette Balch. 2020.
+ABIDES: Towards high-fidelity multi-agent market simulation. InPro-
+ceedings of the 2020 ACM SIGSIM Conference on Principles of Ad-
+vanced Discrete Simulation, SIGSIM-PADS ’20, Miami, FL, Spain, pp.
+11–22. New York, NY , USA: Association for Computing Machinery.
+https://doi.org/10.1145/3384441.3395986.
+[12] van Hasselt, Hado, Arthur Guez, and David Silver. 2016. Deep reinforce-
+ment learning with double Q-learning. InProceedings of the Thirtieth
+AAAI Conference on Artificial Intelligence, AAAI’16, pp. 2094–2100.
+[13] Bertsimas, Dimitris, and Andrew W. Lo. 1998. Optimal control of
+execution costs.Journal of Financial Markets1(1): 1–50. Elsevier.
+[14] Almgren, Robert, and Neil Chriss. 2001. Optimal execution of portfolio
+transactions.Journal of Risk3: 5–40.
+[15] Obizhaeva, Anna A., and Jiang Wang. 2005. Optimal trading strategy
+and supply/demand dynamics.Journal of Financial Markets16(1): 1–
+32. Elsevier.
+[16] Busseti, Enzo, and Fabrizio Lillo. 2012. Calibration of optimal execution
+of financial transactions in the presence of transient market impact.
+Journal of Statistical Mechanics: Theory and Experiment2012(09):
+P09010. IOP Publishing.
+[17] Cartea, ´Alvaro, Sebastian Jaimungal, and Jos ´e Penalva. 2015.Algorith-
+mic and High-Frequency Trading. Cambridge: Cambridge University
+Press.
+[18] Nevmyvaka, Yuriy, Yi Feng, and Michael Kearns. 2006. Reinforcement
+learning for optimized trade execution. InProceedings of the 23rd
+International Conference on Machine Learning, pp. 673–680.
+[19] Pardo, Fernando de Meer, Christoph Auth, and Florin Dascalu. 2022. A
+modular framework for reinforcement learning optimal execution.arXiv
+preprintarXiv:2208.06244.
+[20] Moallemi, Ciamac C., and Muye Wang. 2022. A reinforcement learning
+approach to optimal execution.Quantitative Finance22(6): 1051–1069.
+Taylor and Francis.
+[21] Nagy, Peer, Jan-P. Calliess, and Stefan Zohren. 2023. Asynchronous
+deep double dueling Q-learning for trading-signal execution in
+limit order book markets.Frontiers in Artificial Intelligence6.
+https://doi.org/10.3389/frai.2023.1151003.
+[22] Karpe, Micha ¨el, Jin Fang, Zhongyao Ma, and Chen Wang. 2020. Multi-
+agent reinforcement learning in a realistic limit order book market
+simulation.arXiv preprintarXiv:2006.05574.
+[23] Chevalier, Etienne, Yadh Hafsi, and Vathana Ly Vath. 2023. Uncov-
+ering market disorder and liquidity trends detection.arXiv preprint.
+https://doi.org/10.48550/arXiv.2310.09273.
+[24] Harvey, Campbell, Anthony Ledford, Emidio Sciulli, Philipp Usti-
+nov, and Stefan Zohren. 2021. Quantifying long-term market im-
+pact.The Journal of Portfolio Management48: jpm.2021.1.324.
+https://doi.org/10.3905/jpm.2021.1.324.
+[25] Amrouni, Selim, Aymeric Moulin, Jared Vann, Svitlana Vyetrenko,
+Tucker Balch, and Manuela Veloso. 2022. ABIDES-Gym: Gym envi-
+ronments for multi-agent discrete event simulation and application to
+financial markets. InProceedings of the Second ACM International
+Conference on AI in Finance, ICAIF ’21, Virtual Event, Art. no. 30,
+9 pp. New York, NY , USA: Association for Computing Machinery.
+https://doi.org/10.1145/3490354.3494433.
+[26] Perold, Andr ´e F. 1988. The Implementation Shortfall.Journal of Portfo-
+lio Management14(3): 4–9. New York, NY , USA: Institutional Investor
+Journals. https://doi.org/10.3905/jpm.1988.409150.
+[Shi and Cartlidge(2023)] Shi, Zijian, and John Cartlidge. 2023. Neural
+stochastic agent-based limit order book simulation: A hybrid method-
+ology. InProceedings of the 2023 International Conference on Au-
+tonomous Agents and Multiagent Systems, AAMAS ’23, London, United
+Kingdom, pp. 2481–2483. Richland, SC: International Foundation for
+Autonomous Agents and Multiagent Systems.
+[27] Puterman, Martin L. 1990. Markov decision processes.Handbooks in
+Operations Research and Management Science2: 331–434. Elsevier.
+[28] Schulman, John, Filip Wolski, Prafulla Dhariwal, Alec Radford, and
+Oleg Klimov. 2017. Proximal policy optimization algorithms.CoRR
+abs/1707.06347.
+[29] Schulman, John, Sergey Levine, Pieter Abbeel, Michael I. Jordan, and
+Philipp Moritz. 2015. Trust region policy optimization. InProceedings
+of the 32nd International Conference on Machine Learning (ICML), vol.
+37, pp. 1889–1897.
+[30] Mnih, V olodymyr, Koray Kavukcuoglu, David Silver, Andrei A. Rusu,
+Joel Veness, Marc G. Bellemare, Alex Graves, Martin Riedmiller,
+Andreas K. Fidjeland, Georg Ostrovski, et al. 2015. Human-level con-
+trol through deep reinforcement learning.Nature518(7540): 529–533.
+Nature Publishing Group.
+8

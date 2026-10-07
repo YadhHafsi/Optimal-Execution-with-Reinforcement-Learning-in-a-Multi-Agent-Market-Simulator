@@ -1,0 +1,54 @@
+# Standard configuration of Hafsi & Vittori (2026), Section V-A / V-B.
+# All quantities in the "environment" section are forwarded to
+# SubGymMarketsExecutionEnv_v0; "background" is forwarded to the ABIDES RMSC-4
+# configuration builder (abides_markets.configs.rmsc04.build_config).
+name: paper
+
+environment:
+  background_config: rmsc04
+  mkt_close: "16:00:00"
+  timestep_duration: "1s"          # 1-second control frequency
+  starting_cash: 1000000
+  state_history_length: 4          # state contains 3 lagged mid-price changes
+  market_data_buffer_length: 50
+  first_interval: "00:05:00"       # execution starts 5 min after the open (see DESIGN.md, D5)
+  parent_order_size: 20000         # X0
+  execution_window: "00:30:00"     # T = 30 minutes
+  direction: BUY
+  q_min: 20                        # Q_min
+  num_action_levels: 4             # actions: nothing, 20, 40, 60, 80 shares
+  depth_penalty_alpha: 2.0         # alpha
+  beta_not_enough: 5.0             # terminal penalty per unexecuted share
+  beta_too_much: 5.0               # penalty per share of over-execution
+  is_weight: 1.0
+
+background:
+  num_noise_agents: 1000
+  num_value_agents: 102
+  num_momentum_agents: 12
+  mm_wake_up_freq: "60S"           # ABIDES RMSC-4 default (DESIGN.md, D4; CHANGES.md, C9)
+
+training:
+  algorithm: DQN
+  seed: 10
+  learning_rates: [1.0e-2, 1.0e-3, 1.0e-4]   # Figure 4
+  selected_learning_rate: 1.0e-3             # policy evaluated in Figures 5-8
+  total_timesteps: 100000
+  lr_decay_steps: 90000
+  epsilon_timesteps: 10000
+  final_epsilon: 0.02
+  gamma: 0.9999
+  hiddens: [50, 20]
+
+evaluation:
+  policies: [RL, TWAP, Passive, Random]
+  num_seeds: 50            # first 20 seeds -> distribution plots; all 50 -> t-tests
+  plot_seeds: 20
+  seed_offset: 1000        # evaluation seeds are disjoint from the training seed
+  # Robustness scenarios (Figure 8, Tables II-III): overrides of the background section.
+  scenarios:
+    standard: {}
+    noise_10: {num_noise_agents: 10}
+    noise_2000: {num_noise_agents: 2000}
+    momentum_6: {num_momentum_agents: 6}
+    momentum_24: {num_momentum_agents: 24}

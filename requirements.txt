@@ -1,0 +1,24 @@
+# Pinned top-level dependencies (Python 3.10). The full frozen environment used
+# for the results in docs/ANALYSIS.md is in requirements-lock.txt.
+#
+# Install (see README.md):
+#   uv pip install -r requirements.txt -e ./abides-core -e ./abides-markets -e ./abides-gym
+numpy==1.23.5
+pandas==1.5.3
+scipy==1.10.1
+torch==1.13.1
+ray[rllib]==2.2.0
+gym==0.23.1
+setuptools<70          # RLlib 2.2 imports pkg_resources
+wheel
+pyyaml
+matplotlib
+seaborn
+tqdm
+coloredlogs
+psutil
+pyarrow<15
+protobuf<3.21
+tensorboardX
+markdown
+pytest
